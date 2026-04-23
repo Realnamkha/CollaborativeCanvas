@@ -1,10 +1,93 @@
-import { WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { prismaClient } from "@repo/db/client";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const SECRET = process.env.JWT_SECRET;
+if (!SECRET) throw new Error("JWT_SECRET is not set");
+
 const wss = new WebSocketServer({ port: 8080 });
 
-wss.on("connection", function connection(ws) {
-  ws.on("error", console.error);
+interface User {
+  ws: WebSocket;
+  rooms: Set<string>;
+  userId: string;
+}
 
-  ws.on("message", function message(data) {
-    ws.send("ping pong");
+interface MessageData {
+  type: "join_room" | "leave_room" | "chat";
+  roomId?: string;
+  message?: string;
+}
+
+const users = new Map<WebSocket, User>();
+
+function checkUser(token: string): string | null {
+  try {
+    const decoded = jwt.verify(token, SECRET!) as JwtPayload;
+    return decoded?.userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getUser(ws: WebSocket): User | undefined {
+  return users.get(ws);
+}
+
+wss.on("connection", function connection(ws, request) {
+  const url = request.url;
+  if (!url) return ws.close();
+
+  const token = new URLSearchParams(url.split("?")[1]).get("token") || "";
+  const userId = checkUser(token);
+
+  if (!userId) return ws.close();
+
+  users.set(ws, { userId, rooms: new Set(), ws });
+
+  ws.on("message", async function message(data) {
+    try {
+      const parsedData: MessageData = JSON.parse(data.toString());
+      const user = getUser(ws);
+      if (!user) return;
+
+      if (parsedData.type === "join_room" && parsedData.roomId) {
+        user.rooms.add(parsedData.roomId);
+      }
+
+      if (parsedData.type === "leave_room" && parsedData.roomId) {
+        user.rooms.delete(parsedData.roomId);
+      }
+
+      if (
+        parsedData.type === "chat" &&
+        parsedData.roomId &&
+        parsedData.message
+      ) {
+        const { roomId, message } = parsedData;
+
+        users.forEach((u) => {
+          if (u.rooms.has(roomId)) {
+            u.ws.send(JSON.stringify({ type: "chat", message, roomId }));
+          }
+        });
+        await prismaClient.chat.create({
+          data: {
+            roomId: Number(roomId),
+            message,
+            userId,
+          },
+        });
+      }
+    } catch {
+      console.error("Invalid message received");
+    }
+  });
+
+  ws.on("close", () => {
+    users.delete(ws);
   });
 });
