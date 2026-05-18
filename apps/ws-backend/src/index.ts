@@ -18,7 +18,7 @@ interface User {
 
 interface MessageData {
   type: "join_room" | "leave_room" | "chat";
-  roomId?: string;
+  roomId?: number;
   message?: string;
 }
 
@@ -55,11 +55,12 @@ wss.on("connection", function connection(ws, request) {
       if (!user) return;
 
       if (parsedData.type === "join_room" && parsedData.roomId) {
-        user.rooms.add(parsedData.roomId);
+        console.log("10");
+        user.rooms.add(String(parsedData.roomId));
       }
 
       if (parsedData.type === "leave_room" && parsedData.roomId) {
-        user.rooms.delete(parsedData.roomId);
+        user.rooms.delete(String(parsedData.roomId));
       }
 
       if (
@@ -67,23 +68,27 @@ wss.on("connection", function connection(ws, request) {
         parsedData.roomId &&
         parsedData.message
       ) {
+        console.log("1000");
+        console.log("roomId:", parsedData.roomId, typeof parsedData.roomId);
+        console.log("userId:", userId);
+
         const { roomId, message } = parsedData;
 
-        users.forEach((u) => {
-          if (u.rooms.has(roomId)) {
-            u.ws.send(JSON.stringify({ type: "chat", message, roomId }));
-          }
-        });
-        await prismaClient.chat.create({
-          data: {
-            roomId: Number(roomId),
-            message,
-            userId,
-          },
-        });
+        try {
+          const saved = await prismaClient.chat.create({
+            data: {
+              roomId,
+              message,
+              userId,
+            },
+          });
+          console.log("Saved to DB:", saved); // ← add
+        } catch (dbError) {
+          console.error("Prisma error:", dbError); // ← separate DB catch
+        }
       }
-    } catch {
-      console.error("Invalid message received");
+    } catch (error) {
+      console.error("Error processing message:", error);
     }
   });
 
