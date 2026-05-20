@@ -15,6 +15,9 @@ export type Shape =
       centerX: number;
       centerY: number;
       radius: number;
+    }
+  | {
+      type: "pan";
     };
 
 export default async function initDraw(

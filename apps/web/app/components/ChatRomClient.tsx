@@ -9,7 +9,7 @@ export type Tool =
   | "circle"
   | "triangle"
   | "pen"
-  | "eraser"
+  | "pan"
   | "line"
   | "arrow"
   | "text";
@@ -35,7 +35,7 @@ const tools: { id: Tool; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
-    id: "eraser",
+    id: "pan",
     label: "Eraser",
     icon: (
       <svg
@@ -167,15 +167,24 @@ export default function Canvas({ roomId }: { roomId: string }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !socket) return;
-    alert("created a game loopp");
 
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
     const g = new Game(canvas, roomId, socket);
     setGame(g);
+
+    // Handle resize
+    const handleResize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      g.clearCanvas(); // redraw after resize
+    };
+    window.addEventListener("resize", handleResize);
+
     return () => {
       g.destroy();
+      window.removeEventListener("resize", handleResize);
     };
   }, [socket]);
 
