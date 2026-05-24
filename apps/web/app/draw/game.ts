@@ -17,6 +17,9 @@ export class Game {
   private lastPanY = 0;
   private scale = 1;
   private selectedTool: Tool = "circle";
+  private selectedShape: Shape | null = null;
+  private isDraggingHandle = false;
+  private activeHandle: string | null = null;
   socket: WebSocket;
 
   // Store bound handlers so they can be removed later
@@ -52,7 +55,47 @@ export class Game {
   toWorldY(screenY: number) {
     return (screenY - this.panY) / this.scale;
   }
+  isInsideRect(shape: Shape, x: number, y: number) {
+    if (shape.type !== "rect") return false;
+    return (
+      x >= shape.x &&
+      x <= shape.x + shape.width &&
+      y >= shape.y &&
+      y <= shape.y + shape.height
+    );
+  }
+  isInsideCircle(shape: Shape, x: number, y: number) {
+    if (shape.type !== "circle") return false;
+    const dx = x - shape.centerX;
+    const dy = y - shape.centerY;
+    return Math.sqrt(dx * dx + dy * dy) <= shape.radius;
+  }
+  drawHandle(x: number, y: number) {
+    this.ctx.fillStyle = "white";
+    this.ctx.fillRect(x - 4, y - 4, 8, 8);
+    this.ctx.strokeStyle = "rgba(0,150,255)";
+    this.ctx.strokeRect(x - 4, y - 4, 8, 8);
+  }
 
+  getShapeBounds(shape: Shape) {
+    if (shape.type === "rect") {
+      return {
+        x: shape.x,
+        y: shape.y,
+        width: shape.width,
+        height: shape.height,
+      };
+    }
+    if (shape.type === "circle") {
+      return {
+        x: shape.centerX - shape.radius,
+        y: shape.centerY - shape.radius,
+        width: shape.radius * 2,
+        height: shape.radius * 2,
+      };
+    }
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
   initHandlers() {
     this.socket.onmessage = (event) => {
       console.log("received from server:", event.data);
@@ -63,6 +106,30 @@ export class Game {
         this.clearCanvas();
       }
     };
+  }
+  getClickedHandle(worldX: number, worldY: number): string | null {
+    if (!this.selectedShape) return null;
+
+    const bounds = this.getShapeBounds(this.selectedShape);
+    const handles = {
+      tl: { x: bounds.x - 5, y: bounds.y - 5 },
+      tr: { x: bounds.x + bounds.width + 5, y: bounds.y - 5 },
+      bl: { x: bounds.x - 5, y: bounds.y + bounds.height + 5 },
+      br: { x: bounds.x + bounds.width + 5, y: bounds.y + bounds.height + 5 },
+    };
+
+    for (const [name, pos] of Object.entries(handles)) {
+      // check if click is within 8px of handle center
+      if (
+        worldX >= pos.x - 8 &&
+        worldX <= pos.x + 8 &&
+        worldY >= pos.y - 8 &&
+        worldY <= pos.y + 8
+      ) {
+        return name;
+      }
+    }
+    return null;
   }
 
   clearCanvas() {
@@ -90,6 +157,28 @@ export class Game {
         this.ctx.closePath();
       }
     });
+    if (this.selectedShape) {
+      this.ctx.strokeStyle = "rgba(0, 150, 255)"; // blue selection
+      // this.ctx.setLineDash([]); // dashed border
+
+      let bounds = this.getShapeBounds(this.selectedShape);
+      this.ctx.strokeRect(
+        bounds.x - 5,
+        bounds.y - 5,
+        bounds.width + 10,
+        bounds.height + 10
+      );
+      // this.ctx.setLineDash([]);
+
+      // draw 4 corner handles
+      this.drawHandle(bounds.x - 5, bounds.y - 5); // top-left
+      this.drawHandle(bounds.x + bounds.width + 5, bounds.y - 5); // top-right
+      this.drawHandle(bounds.x - 5, bounds.y + bounds.height + 5); // bottom-left
+      this.drawHandle(
+        bounds.x + bounds.width + 5,
+        bounds.y + bounds.height + 5
+      ); // bottom-right
+    }
   }
 
   initMouseHandlers() {
@@ -100,18 +189,39 @@ export class Game {
         this.isPanning = true;
         this.lastPanX = e.clientX;
         this.lastPanY = e.clientY;
-        return;
+        return; // ✅ exits early
       }
 
+      if (this.selectedTool === "select") {
+        const worldX = this.toWorldX(e.clientX);
+        const worldY = this.toWorldY(e.clientY);
+
+        const handle = this.getClickedHandle(worldX, worldY);
+        if (handle && this.selectedShape) {
+          this.isDraggingHandle = true;
+          this.activeHandle = handle;
+          return;
+        }
+
+        this.selectedShape = null;
+        for (const shape of this.existingShapes) {
+          if (
+            this.isInsideRect(shape, worldX, worldY) ||
+            this.isInsideCircle(shape, worldX, worldY)
+          ) {
+            this.selectedShape = shape;
+            break;
+          }
+        }
+        this.clearCanvas();
+        return; // ✅ exits early, never reaches clicked = true
+      }
+
+      // only reaches here for drawing tools
       if (e.button === 0) {
         this.clicked = true;
         this.startX = this.toWorldX(e.clientX);
         this.startY = this.toWorldY(e.clientY);
-        console.log(
-          "drawing started at world coords:",
-          this.startX,
-          this.startY
-        );
       }
     };
 
@@ -143,6 +253,11 @@ export class Game {
             roomId: this.roomId,
           })
         );
+      }
+      if (this.isDraggingHandle) {
+        this.isDraggingHandle = false;
+        this.activeHandle = null;
+        return;
       }
 
       if (this.selectedTool === "circle") {
@@ -196,6 +311,18 @@ export class Game {
           this.ctx.closePath();
         }
       }
+      if (this.isDraggingHandle && this.selectedShape) {
+        const worldX = this.toWorldX(e.clientX);
+        const worldY = this.toWorldY(e.clientY);
+        this.resizeShape(
+          this.selectedShape,
+          this.activeHandle!,
+          worldX,
+          worldY
+        );
+        this.clearCanvas();
+        return;
+      }
     };
     this.handleWheel = (e) => {
       e.preventDefault();
@@ -214,6 +341,46 @@ export class Game {
     this.canvas.addEventListener("mouseup", this.handleMouseUp);
     this.canvas.addEventListener("mousemove", this.handleMouseMove);
     this.canvas.addEventListener("wheel", this.handleWheel, { passive: false });
+  }
+  resizeShape(shape: Shape, handle: string, worldX: number, worldY: number) {
+    if (shape.type === "rect") {
+      if (handle === "br") {
+        // top-left fixed, stretch right and down
+        shape.width = worldX - shape.x;
+        shape.height = worldY - shape.y;
+      }
+
+      if (handle === "tl") {
+        // bottom-right fixed, stretch left and up
+        shape.width += shape.x - worldX;
+        shape.height += shape.y - worldY;
+        shape.x = worldX;
+        shape.y = worldY;
+      }
+
+      if (handle === "tr") {
+        // bottom-left fixed, stretch right and up
+        shape.width = worldX - shape.x; // width stretches right
+        shape.height += shape.y - worldY; // height stretches up
+        shape.y = worldY; // top edge moves up
+        // shape.x stays same ← bottom-left x is fixed
+      }
+
+      if (handle === "bl") {
+        // top-right fixed, stretch left and down
+        shape.width += shape.x - worldX; // width stretches left
+        shape.height = worldY - shape.y; // height stretches down
+        shape.x = worldX; // left edge moves
+        // shape.y stays same ← top-right y is fixed
+      }
+      // add tr and bl similarly
+    }
+
+    if (shape.type === "circle") {
+      const dx = worldX - shape.centerX;
+      const dy = worldY - shape.centerY;
+      shape.radius = Math.sqrt(dx * dx + dy * dy); // distance from center
+    }
   }
 
   destroy() {
