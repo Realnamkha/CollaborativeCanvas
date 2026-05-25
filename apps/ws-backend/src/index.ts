@@ -17,7 +17,7 @@ interface User {
 }
 
 interface MessageData {
-  type: "join_room" | "leave_room" | "chat";
+  type: "join_room" | "leave_room" | "chat" | "update";
   roomId?: number;
   message?: string;
 }
@@ -82,9 +82,52 @@ wss.on("connection", function connection(ws, request) {
               userId,
             },
           });
-          console.log("Saved to DB:", saved); // ← add
+
+          users.forEach((u) => {
+            if (u.rooms.has(String(roomId))) {
+              u.ws.send(
+                JSON.stringify({
+                  type: "chat",
+                  message,
+                  roomId,
+                })
+              );
+            }
+          });
         } catch (dbError) {
           console.error("Prisma error:", dbError); // ← separate DB catch
+        }
+      }
+
+      if (
+        parsedData.type === "update" &&
+        parsedData.roomId &&
+        parsedData.message
+      ) {
+        const { roomId, message } = parsedData;
+        const parsedShape = JSON.parse(message);
+        const shapeId = parsedShape.shape.id;
+
+        try {
+          const existing = await prismaClient.chat.findFirst({
+            where: { roomId, message: { contains: shapeId } },
+          });
+
+          if (existing) {
+            await prismaClient.chat.update({
+              where: { id: existing.id },
+              data: { message },
+            });
+
+            // ✅ broadcast only if updated
+            users.forEach((u) => {
+              if (u.rooms.has(String(roomId))) {
+                u.ws.send(JSON.stringify({ type: "update", message }));
+              }
+            });
+          }
+        } catch (dbError) {
+          console.error("Prisma error:", dbError);
         }
       }
     } catch (error) {

@@ -105,6 +105,21 @@ export class Game {
         this.existingShapes.push(parsedShape.shape);
         this.clearCanvas();
       }
+      if (message.type === "update") {
+        console.log("update");
+        const parsedShape = JSON.parse(message.message);
+        const updatedShape = parsedShape.shape;
+        console.log("updated shape:", updatedShape);
+
+        // find the shape by id and replace it
+        const index = this.existingShapes.findIndex(
+          (s) => s.id === updatedShape.id
+        );
+        if (index !== -1) {
+          this.existingShapes[index] = updatedShape;
+          this.clearCanvas();
+        }
+      }
     };
   }
   getClickedHandle(worldX: number, worldY: number): string | null {
@@ -231,6 +246,21 @@ export class Game {
         this.isPanning = false;
         return;
       }
+      if (this.isDraggingHandle) {
+        this.isDraggingHandle = false;
+        this.activeHandle = null;
+        if (this.selectedShape) {
+          console.log("1212");
+          this.socket.send(
+            JSON.stringify({
+              type: "update",
+              message: JSON.stringify({ shape: this.selectedShape }),
+              roomId: this.roomId,
+            })
+          );
+        }
+        return;
+      }
       this.clicked = false;
       console.log("drawing stopped");
       const width = this.toWorldX(e.clientX) - this.startX;
@@ -238,6 +268,7 @@ export class Game {
 
       if (this.selectedTool === "rectangle") {
         const shape: Shape = {
+          id: crypto.randomUUID(),
           type: "rect",
           x: this.startX,
           y: this.startY,
@@ -254,17 +285,18 @@ export class Game {
           })
         );
       }
-      if (this.isDraggingHandle) {
-        this.isDraggingHandle = false;
-        this.activeHandle = null;
-        return;
-      }
 
       if (this.selectedTool === "circle") {
         const radius = Math.max(height, width) / 2;
         const centerX = this.startX + radius;
         const centerY = this.startY + radius;
-        const shape: Shape = { type: "circle", centerX, centerY, radius };
+        const shape: Shape = {
+          id: crypto.randomUUID(),
+          type: "circle",
+          centerX,
+          centerY,
+          radius,
+        };
         this.existingShapes.push(shape);
         this.clearCanvas();
         this.socket.send(
@@ -284,6 +316,18 @@ export class Game {
         this.panY += e.clientY - this.lastPanY;
         this.lastPanX = e.clientX;
         this.lastPanY = e.clientY;
+        this.clearCanvas();
+        return;
+      }
+      if (this.isDraggingHandle && this.selectedShape) {
+        const worldX = this.toWorldX(e.clientX);
+        const worldY = this.toWorldY(e.clientY);
+        this.resizeShape(
+          this.selectedShape,
+          this.activeHandle!,
+          worldX,
+          worldY
+        );
         this.clearCanvas();
         return;
       }
@@ -310,18 +354,6 @@ export class Game {
           this.ctx.stroke();
           this.ctx.closePath();
         }
-      }
-      if (this.isDraggingHandle && this.selectedShape) {
-        const worldX = this.toWorldX(e.clientX);
-        const worldY = this.toWorldY(e.clientY);
-        this.resizeShape(
-          this.selectedShape,
-          this.activeHandle!,
-          worldX,
-          worldY
-        );
-        this.clearCanvas();
-        return;
       }
     };
     this.handleWheel = (e) => {
