@@ -247,6 +247,8 @@ export class Game {
         return;
       }
       if (this.isDraggingHandle) {
+        console.log("existingShapes count:", this.existingShapes.length);
+        console.log("shapes:", this.existingShapes);
         this.isDraggingHandle = false;
         this.activeHandle = null;
         if (this.selectedShape) {
@@ -259,6 +261,7 @@ export class Game {
             })
           );
         }
+        this.clearCanvas();
         return;
       }
       this.clicked = false;
@@ -320,6 +323,7 @@ export class Game {
         return;
       }
       if (this.isDraggingHandle && this.selectedShape) {
+        console.log("clicked during drag:", this.clicked);
         const worldX = this.toWorldX(e.clientX);
         const worldY = this.toWorldY(e.clientY);
         this.resizeShape(

@@ -54,40 +54,6 @@ const tools: { id: Tool; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
-    id: "line",
-    label: "Line",
-    icon: (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        className="w-5 h-5"
-      >
-        <line x1="4" y1="20" x2="20" y2="4" />
-      </svg>
-    ),
-  },
-  {
-    id: "arrow",
-    label: "Arrow",
-    icon: (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="w-5 h-5"
-      >
-        <line x1="5" y1="19" x2="19" y2="5" />
-        <polyline points="8 5 19 5 19 16" />
-      </svg>
-    ),
-  },
-  {
     id: "rectangle",
     label: "Rectangle",
     icon: (
@@ -119,23 +85,6 @@ const tools: { id: Tool; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
-    id: "triangle",
-    label: "Triangle",
-    icon: (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="w-5 h-5"
-      >
-        <polygon points="12 3 22 21 2 21" />
-      </svg>
-    ),
-  },
-  {
     id: "select",
     label: "Select",
     icon: (
@@ -147,25 +96,6 @@ const tools: { id: Tool; label: string; icon: React.ReactNode }[] = [
         className="w-5 h-5"
       >
         <path d="M5 3l14 9-7 1-4 7z" />
-      </svg>
-    ),
-  },
-  {
-    id: "text",
-    label: "Text",
-    icon: (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="w-5 h-5"
-      >
-        <polyline points="4 7 4 4 20 4 20 7" />
-        <line x1="9" y1="20" x2="15" y2="20" />
-        <line x1="12" y1="4" x2="12" y2="20" />
       </svg>
     ),
   },

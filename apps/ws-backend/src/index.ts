@@ -84,7 +84,8 @@ wss.on("connection", function connection(ws, request) {
           });
 
           users.forEach((u) => {
-            if (u.rooms.has(String(roomId))) {
+            if (u.rooms.has(String(roomId)) && u.ws !== ws) {
+              // ← add && u.ws !== ws
               u.ws.send(
                 JSON.stringify({
                   type: "chat",
@@ -119,9 +120,8 @@ wss.on("connection", function connection(ws, request) {
               data: { message },
             });
 
-            // ✅ broadcast only if updated
             users.forEach((u) => {
-              if (u.rooms.has(String(roomId))) {
+              if (u.rooms.has(String(roomId)) && u.ws !== ws) {
                 u.ws.send(JSON.stringify({ type: "update", message }));
               }
             });
