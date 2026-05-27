@@ -29,10 +29,14 @@ export function AuthPage({ isSignin }: AuthPageProps) {
 
     try {
       const endpoint = isSignin ? "/sign-in" : "/sign-up";
-      const response = await axios.post(`${BACKEND_URL}${endpoint}`, {
-        email,
-        password,
-      });
+      const response = await axios.post(
+        `${BACKEND_URL}${endpoint}`,
+        {
+          email,
+          password,
+        },
+        { withCredentials: true }
+      );
 
       console.log(response.data);
 
