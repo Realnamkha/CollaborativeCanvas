@@ -13,7 +13,11 @@ async function getRoom(slug: string) {
   return response.data.room; // return full room, not just id
 }
 
-export default async function Room({ params }: { params: { slug: string } }) {
+export default async function Room({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
   const slug = (await params).slug;
   const room = await getRoom(slug);
 
