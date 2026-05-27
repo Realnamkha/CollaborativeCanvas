@@ -15,9 +15,9 @@ const app = express();
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
     methods: ["GET", "POST"],
-    credentials: true, // if using cookies
+    credentials: true,
   })
 );
 app.use(express.json());
@@ -92,9 +92,9 @@ app.post("/sign-in", async (req: Request, res: Response) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // HTTPS only in prod
-      sameSite: "lax",
-      maxAge: 60 * 60 * 1000, // 1 hour in ms
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // ✅
+      maxAge: 60 * 60 * 1000,
     });
 
     res.json({ success: true, user: { id: user.id, email: user.email } });
@@ -166,7 +166,7 @@ app.post("/sign-out", (req: Request, res: Response) => {
   res.clearCookie("token", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // ✅
   });
   res.json({ success: true });
 });
